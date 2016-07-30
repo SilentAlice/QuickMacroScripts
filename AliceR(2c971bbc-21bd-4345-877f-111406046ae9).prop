@@ -1,0 +1,17 @@
+{
+   "BestResolution" : {
+      "X" : 0,
+      "Y" : 0
+   },
+   "ChangeFileList" : 0,
+   "Description" : "",
+   "FileVersion" : {
+      ".atc" : 0,
+      ".mq" : 0,
+      ".prop" : 0,
+      ".rtd" : 0,
+      ".ui" : 0
+   },
+   "Name" : "AliceR",
+   "id" : "2c971bbc-21bd-4345-877f-111406046ae9"
+}
