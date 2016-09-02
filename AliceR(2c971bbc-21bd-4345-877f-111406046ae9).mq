@@ -20,6 +20,7 @@ Dim plan = ReadUIConfig("plan", 0)				// Predefined plans
 Dim march = ReadUIConfig("march", True)			// Expedition (march for short)
 Dim reconnect = ReadUIConfig("reconnect", True)	// Reconnect 
 Dim pve = ReadUIConfig("pve", False)			// Story/PVE
+Dim activity = ReadUIConfig("activity", True)	// Activity
 
 /* PVE/Story mode */
 Dim team = ReadUIConfig("team", 0)					// Team Number : 1-4
@@ -48,8 +49,9 @@ For iterator = 0 To 5 Step 1 '步长为-1，每次循环结束 iterator 都-1，
 Next
 */
 /* ***************** OCR Preparation ***********************/
-TracePrint SetDict(0, "Attachment:ocr.txt")
+TracePrint SetDictEx(0, "Attachment:ocr.txt")
 TracePrint UseDict(0)
+SetRowsNumber(0)
 
 
 /******************Configure TracePrint****************/
@@ -114,6 +116,28 @@ ReleaseCapture
 Delay slice
 
 
+If activity = True Then 
+	Do
+		If needFun(0) Then 
+			If (Not doQuest()) Then 
+				Goto Reset
+			End If
+		End If
+		
+		If march And needFun(1) Then 
+			If (Not doMarch()) Then 
+				Goto Reset
+			End If
+		End If
+		
+		If doActivity() = False Then // Need to restart 
+			Goto Reset
+		End If
+		
+	Loop
+End If
+
+/* PVE */
 If pve = True Then 
 	
 	Dim count = 0
@@ -189,7 +213,7 @@ If march = True And pve = False Then
 			if getPage() <> 101 Then
 				KeyPress "Power"
 			End If
-			Delay (period_time * 60000)
+			Delay (period_time * 1000)
 			KeyPress "Power"
 			Delay (2 * slice)
 			Swipe 630, 1830, 630, 430, 500
@@ -217,33 +241,36 @@ If pageNum > 0 And pageNum < 50 Then
 	Goto FunctionBegin
 ElseIf pageNum < 70 And pageNum > 49 Then
 	// TODO: Tap back
-ElseIf pageNum < 100 And pageNum > 69 Then
+//ElseIf pageNum < 100 And pageNum > 69 Then
 	// TODO: solve them
 ElseIf pageNum = 100 Then
 	Goto FunctionBegin
 Else
 	restartApp()
-	For i = 1 To 3
-    	//try 3 times
-    	Delay ( (10+5*i) * slice)
-		If getPage() <> 102 Then 
-			Delay (20 * slice)	
+   	For j = 1 To 30
+   		If getPage() <> 102 Then 
+			Delay (slice)
 		Else 
-			Tap 100, 960
-			For j = 0 To 5
-				Delay (10 * slice)
-				If getPage() = 100 Then 
-					Exit For
-				End If
-			Next
-			Goto FunctionBegin
+			Exit For
 		End If
-	Next
-	
-	// Tried 3 times; Give up
+   	Next
+
+	If getPage() <> 102 Then // Cant startup
+		Goto Finish // Give up
+	Else 
+		Tap 100, 960 // Enter game
+		For j = 0 To 30
+			Delay (slice)
+			If getPage() = 100 Then 
+				Exit For
+			End If
+		Next
+		Goto FunctionBegin
+	End If
+//	
 End If
 Goto Finish
-//Goto FunctionBegin
+
 
 Rem Finish
 EndScript
@@ -262,7 +289,7 @@ Function getPage()
 	Dim ret = -1
 	KeepCapture
 	// Find 活动 Button
-	If FindStr(26,451,93,510,"活","FFFFFF-332A28",0.9,intX,intY) > -1 Then
+	If FindStr(26,451,93,510,"活","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
 		TracePrint "Main Page" // Main 0
 		ret = 100
 	ElseIf CmpColorEx("70|100|044AAD,70|195|C08D00,70|290|BF8C00,70|385|BF8C00,70|480|BE8B00", 0.9) = 1 Then
@@ -273,17 +300,17 @@ Function getPage()
 		TracePrint "Fix Page" 	// Fixting
 		ret = 2
 		
-	ElseIf FindStr(800,41,864,104,"演","FFFFFF-332A28",0.9,intX,intY) > -1 Then
+	ElseIf FindStr(800,41,864,104,"演","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
 		TracePrint "March Page"	// March
 		ret = 3
 		
-	ElseIf FindStr(933,245,981,287,"准","FFFFFF-332A28",0.9,intX,intY) > -1 Then
+	ElseIf FindStr(933,245,981,287,"准","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
 		TracePrint "TeamPage"	// TeamPage
 		ret = 51
 	ElseIf FindStr(1023, 1004, 1074, 1052, "果", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "BattleResult Page" // Battle Result
 		ret = 52
-	ElseIf FindStr(131, 1376, 191, 1429, "斗", "FFFFFF-332A28", 0.9, intX, intY) > -1 Then
+	ElseIf FindStr(131, 1376, 191, 1429, "斗", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "SlightPage"	// SlightPage 索敌
 		ret = 70
 	ElseIf CmpColorEx("179|1594|52C642,344|1726|4ACA3A,540|1811|52C23A,734|1733|52CA42,935|1586|42C23A", 0.9) = 1 Then
@@ -292,13 +319,16 @@ Function getPage()
 	ElseIf FindStr(300, 1181, 367, 1257, "港", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "Continue Battle Page" // Continue battle ?
 		ret = 72
-	ElseIf FindStr(865, 523, 916, 573, "给", "FFFFFF-332A28", 0.9, intX, intY) > -1 Then
+	ElseIf FindStr(293, 732, 373, 810, "击", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
+		TracePrint "NightWar Page"
+		ret = 73
+	ElseIf FindStr(865, 523, 916, 573, "给", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "Quick Supply" // Quick supply
 		ret = 60
 	ElseIf CmpColorEx("720|720|000000,211|301|000000,250|250|000000,980|980|000000", 0.9) = 1 Then
 		TracePrint "DarkPage"	// Dark
 		ret = 101
-	ElseIf FindStr(79, 1030, 151, 1106, "戏", "FFFFFF-332A28", 0.9, intX, intY) > -1 Then
+	ElseIf FindStr(79, 1030, 151, 1106, "戏", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "LoginPage"
 		ret = 102
 	Else 
@@ -320,7 +350,7 @@ Function needFun(op)
 		End If
 
 	Case 1 // March	
-		If FindStr(887,1490,924,1523,"完","3145D6-D6402D",0.9,intX,intY) > -1 Then 
+		If FindStr(887,1490,924,1523,"完","2135D6-3A3B3A",0.9,intX,intY) > -1 Then 
 			ret = True
 		End If
 	Case 2 // need to return?
@@ -363,7 +393,7 @@ Function doMarch()
 	End If
 
 	KeepCapture 
-	If FindStr(238,1554,988,1617,"收","FFFFFF-332A28",0.9,intX,intY) > -1 // Found
+	If FindStr(238,1554,988,1617,"收","FFFFFF-3A3B3A",0.9,intX,intY) > -1 // Found
 		ReleaseCapture
 		Tap(intX, intY) // Reap march
 		Delay (slice)
@@ -476,6 +506,95 @@ Function doPVE()
 	Loop
 End Function
 
+Function doActivity()
+	Dim tmp
+	tapBtn(1) //出征
+	Delay(slice)
+	tapBtn(11) // choose 出征
+	Delay (slice)
+	tmp = getChapter() - 2 // Choose chapter 2-1
+	// Choose right chapter
+	If tmp < 0 Then // Need to tap next chapter
+		tmp = tmp * (-1)
+		For i = 1 To tmp
+			tapBtn (4)
+			Delay (slice)
+		Next
+	Else 
+		For i = 1 To tmp
+			tapBtn (3)
+			Delay (slice)
+		Next
+	End If
+	
+	Tap 600, 1000 //Start battle
+	Delay (slice)
+	
+	// Default team 1
+	tap(970, 1810) // Qucik supply
+	Delay (slice)
+	tap(290, 1280) // Supply all
+	Delay (2 * slice)
+	
+	fixShip()
+	
+	tapBtn(7) //start battle
+
+	Tap(500,500)
+	While (getPage() <> 70)	// 索敌画面
+		Tap 500, 500
+		Delay(300)
+	Wend
+	
+	// 索敌
+	
+	If FindColor(473, 326, 597, 502, "FFF321", 0, 0.9, intX, intY) < 0 Then 
+		ShowMessage("没有补给舰")
+		// No AP
+		doActivity = False
+		Exit Function
+	End If
+	// Find AP
+	ShowMessage ("发现补给舰")
+	
+	tapBtn (8)	// Begin Battle
+	Delay (2 * slice)
+	
+	Do
+		tmp = getPage()
+		If tmp = 71 Then	// Select team form
+			Tap 740, 1700	// 复纵
+			Exit Do
+		End If
+	Loop
+	
+	Delay(5*slice)
+	// Enter Battle
+	While getPage() < 0
+    	Delay(5*slice)
+	Wend
+	
+	tmp = getPage()
+	If tmp = 73 Then 
+		// Night War?
+		ShowMessage("追击")
+		tapBtn(16) // Night war
+		Delay(5*slice)
+	
+		While getPage() < 0
+    		Delay(5*slice)
+		Wend
+	End If
+	
+	tmp = getPage()
+	While tmp < 70 Or tmp = 200 // 
+		tapBtn (9)
+		Delay (2 * slice)
+		tmp = getPage()
+	Wend
+	
+	battle = True
+End Function
 // Return an avaliable team
 Function getTeam(num)
 
@@ -542,6 +661,10 @@ Function tapBtn(op)
 		Tap 550, 100
 	Case 15 // Aside 5
 		Tap 410, 100
+	Case 16
+		Tap 300, 730 // Night War
+	Case 17
+		Tap 300, 1200 // Give up night war 
 	Case Else
     	//否则
 	End Select
@@ -549,17 +672,18 @@ End Function
 
 Function getChapter()
 	KeepCapture 
-	Dim ret = CInt(Ocr(953,512,1012,601,"FFFFFF-332A28",0.8))
+	Dim ret = CInt(Ocr(953,512,1012,601,"FFFFFF-3A3B3A",0.8))
 	If ret > 10 Then 
 		ret = CInt((ret-5) / 10)
 	End If
 	ReleaseCapture
 	getChapter = ret
+	ShowMessage "第"&ret&"章"
 End Function
 
 Function getSection()
 	KeepCapture 
-	Dim ret = CInt(Ocr(956,589,1016,669,"FFFFFF-332A28",0.8))
+	Dim ret = CInt(Ocr(956,589,1016,669,"FFFFFF-3A3B3A",0.8))
 	If ret > 10 Then 
 		ret = CInt((ret-5) / 10)
 	End If
@@ -608,7 +732,7 @@ Function battle()
 	
 	tmp = getPage()
 	If tmp = 71 Then	// Select team form
-		Select Case team
+		Select Case form
 		Case 0
     		Tap 940, 1540
 		Case 1
@@ -637,4 +761,30 @@ Function battle()
 	Wend
 	
 	battle = True
+End Function
+
+Function fixShip()
+
+	KeepCapture
+	If FindColor(476, 474, 480, 1515, "0808B5", 0, 0.9, intX, intY) > -1 Then 
+		TracePrint("大破修理")
+		ReleaseCapture
+		Tap(820, 1815) //快速修理
+		Delay (slice)
+	
+		Do
+			KeepCapture 
+			If FindColor(456, 280, 461, 1320, "0808B5", 0, 0.9, intX, intY) > -1 Then 
+				Tap intX, intY
+				Delay (slice)
+				ReleaseCapture
+			Else 
+				Exit Do
+			End If
+		Loop
+		Tap 882, 1476 //关闭修理
+		Delay(slice)
+	End If
+	ReleaseCapture 
+	
 End Function
