@@ -1,18 +1,18 @@
-/* Author: SilentMing 2016-07-30 
+/* Author: SilentAlice 2016-09-05
  * Do not use this for commercial purpose
- * Callee will maintain picture stored in memory for optimization */
+ * Callee will maintain picture stored in memory for optimization 
+ * Translation for Glossary/Terminology refers to wikia:
+ * http://warship-girls.wikia.com/wiki/Glossary
+ */
 
 /********************Script Configuration ************************/
-SetControlBarPos 0.5		// Control bar middle, can move
+SetControlBarPos 0.4		// Control bar position, can move
 SetScreenScale (1080, 1920)	// Set Screen Scale 1919, 1079
-
-
 
 /************************Global Tmp******************************/
 Dim intX,intY 				// Main Points  
 Dim iterator = 0			// Iterator for loop
-
-
+Dim i, j, tmp				// Used for loop, function etc
 
 /********************** UI Configuration *************************/
 Dim slice = CInt(ReadUIConfig("slice"))
@@ -22,73 +22,72 @@ Dim reconnect = ReadUIConfig("reconnect", True)	// Reconnect
 Dim pve = ReadUIConfig("pve", False)			// Story/PVE
 Dim activity = ReadUIConfig("activity", True)	// Activity
 
-/* PVE/Story mode */
-Dim team = ReadUIConfig("team", 0)					// Team Number : 1-4
-Dim form = ReadUIConfig("form", 1)					// Team formation : 1-5
-Dim night = ReadUIConfig("night", False)				// Night war: All, last, never
-Dim chapter = ReadUIConfig("chapter")
-Dim section = ReadUIConfig("section")
-Dim turn = ReadUIConfig("turn", 0)
+/* PVE/Story mode, use PVE instead of stories */
+Dim team = ReadUIConfig("team", 0)				// Team Number : 1-4
+Dim form = ReadUIConfig("form", 1)				// Team formation : 1-5
+Dim night = ReadUIConfig("night", False)		// Night war: All, last, never
+Dim chapter = ReadUIConfig("chapter")			// Chapter in PVE
+Dim section = ReadUIConfig("section")			// Section in PVE
+Dim turn = ReadUIConfig("turn", 0)				// Number of nodes battled
 
-// SL
+/* SL(Save & Load) */
 Dim sl = ReadUIConfig("sl", False)
-Dim slp1 = ReadUIConfig("slp1")
-Dim sl1 = ReadUIConfig("sl1") // OXX, XOX, XXO
-Dim slp2 = ReadUIConfig("slp2")
-Dim sl2 = ReadUIConfig("sl2") // OXX, XOX, XXO
+Dim slp1 = ReadUIConfig("slp1")					// SL for point/node 1
+Dim sl1 = ReadUIConfig("sl1") 					// OXX, XOX, XXO
+Dim slp2 = ReadUIConfig("slp2")					// SL for next point (Not must be second node)
+Dim sl2 = ReadUIConfig("sl2")					// OXX, XOX, XXO
 
-// March&Reconnect
-Dim run_time = CInt(ReadUIConfig("run_time")) 				// min
-Dim period_time = CInt(ReadUIConfig("period_time")) 		// min
-Dim reconnect_time = CInt(ReadUIConfig("reconnect_time"))	// second
+/* March&Reconnect (Use march instead of Expedition for short) */
+Dim run_time = CInt(ReadUIConfig("run_time")) 				// min, Total run time for scripts
+Dim period_time = CInt(ReadUIConfig("period_time")) 		// min, Used for march only
+Dim reconnect_time = CInt(ReadUIConfig("reconnect_time"))	// second, used for restart app
 
-/*
-For iterator = 0 To 5 Step 1 '步长为-1，每次循环结束 iterator 都-1，
-    fixs(iterator) = ReadUIConfig("fix" & CStr(iterator))
-    dds(iterator) = ReadUIConfig("dd" & CStr(iterator))
-Next
-*/
-/* ***************** OCR Preparation ***********************/
+//For iterator = 0 To 5 Step 1
+//	fixs(iterator) = ReadUIConfig("fix" & CStr(iterator))
+//    dds(iterator) = ReadUIConfig("dd" & CStr(iterator))
+//Next
+
+/*********************** Non-UI Global Variables********************/
+Dim stime										// Start time
+
+// Used for SL
+Dim enemies = Array()							// Value we encountered
+Dim slEnemies = Array()							// Value we set
+
+/* ************************ OCR Preparation **************************/
 TracePrint SetDictEx(0, "Attachment:ocr.txt")
 TracePrint UseDict(0)
 SetRowsNumber(0)
 
-
-/******************Configure TracePrint****************/
-TracePrint "runtime:" & run_time
-TracePrint "period_time:" & period_time
-TracePrint "slice: " & slice
-TracePrint "plan: " & plan
-TracePrint "form: " & form
-/****************** Test Using Args *******************/
+/*******************************Testing*******************************/
+/* Test Used Args */
 //period_time = 10
 //pve = True
+//activity = False
 
-/****************** Initialization ***********************/
-// PVE Team status check points (X, Y)
-Dim pve_team_checks = Array("475,600,672,600,869,600,1066,600,1263,600,1461,600")
-// Broken Red, Green, Yellow
-Dim broken_colors = Array("0C0CD5","12DE0E","0BBAD5")
-// TimeConfig (Start time)
-Dim stime
-// SL for enemy
-Dim enemies = Array()	// Value we encountered 
-Dim slEnemies = Array() // Value we set
-For iterator = 0 to 4 // 0:reserved,1:CV|2:BB|3:SS|4:CLT|
+/*************************** Initialization **************************/
+/* Initialize random seed */
+Randomize
+/* Init array */		
+For iterator = 0 to 4 							// 0:reserved,1:CV|2:BB|3:SS|4:CLT|
 	enemies(iterator) = -1
 	slEnemies(iterator) = -1
 Next
 
-
+/* Set to natural number */
 chapter = chapter + 1
 section = section + 1
 turn = turn + 1
 
-/********************* Script Start ********************/
 /* Test for avaliablity */
 If slice < 100 Then 
 	slice = 1000
 End If
+If reconnect_time < 1 Then 
+	reconnect_time = 3
+End If
+
+/**************************** Script Start ****************************/
 
 KeepCapture
 If FindColor(0, 0, 0, 0, "000000-FFFFFF", 0, 1.0, intX, intY) > -1 Then
@@ -103,19 +102,26 @@ Else
 End If
 ReleaseCapture 
 
-/******************* Function Begin **********************/
+/***************************** Function Begin ***************************/
 /* MainPage Test */
 Rem FunctionBegin
+
 If getPage() = 100 Then 
-	ShowMessage "Main Page, OK"
-Else 
+	ShowMessage "OK"
+ElseIf getPage() = 61 Then
+	ShowMessage "News"
+	Tap 97, 103 //Not mentioned today
+	Delay (slice)
+	Tap 1026, 1878 // Close this
+	Delay (slice)
+Else
 	ShowMessage "Not Main Page!"
 	Goto Reset
 End If
 ReleaseCapture
-Delay slice
+//Delay slice
 
-
+// Activity
 If activity = True Then 
 	Do
 		If needFun(0) Then 
@@ -147,16 +153,12 @@ If pve = True Then
 		section = 1
 		turn = 1
 		slEnemies(1) = 0
-		slEnemies(4) = 2
-		slEnemies(3) = 5
 		form = 4
 	Case 1	// 6-1 5SS
 		chapter = 6
 		section = 1
 		turn = 1
-		slEnemies(1) = 0
 		slEnemies(4) = 2
-		slEnemies(3) = 5
 		form = 4
     Case 2 	// 4-3 Steal Al
     Case 3	// 3-1 Steal bullets
@@ -169,16 +171,23 @@ If pve = True Then
 	End Select
 	
 	Do
+		// Quest
+		If needFun(0) Then 
+			If (Not doQuest()) Then 
+				Goto Reset
+			End If
+		End If
+		// March
 		If march And needFun(1) Then 
 			If (Not doMarch()) Then 
-		 		Goto Reset
-		 	End If
+				Goto Reset
+			End If
 		End If
-		doPVE()
-		
+		If doPVE() = False Then // Need to restart 
+			Goto Reset
+		End If	
 	Loop
 End If
-
 
 /* Only March : march == true && pve == false */
 Rem MarchOnly
@@ -229,17 +238,16 @@ If march = True And pve = False Then
 	Loop
 End If
 
-
 Rem Reset
 /* Try to reset page to main page and restart */
 // Case1: return to home
 Dim pageNum = getPage()
-Dim i,j
+
 If pageNum > 0 And pageNum < 50 Then 
 	Tap 50, 100
 	Delay (slice)
 	Goto FunctionBegin
-ElseIf pageNum < 70 And pageNum > 49 Then
+//ElseIf pageNum < 70 And pageNum > 49 Then
 	// TODO: Tap back
 //ElseIf pageNum < 100 And pageNum > 69 Then
 	// TODO: solve them
@@ -261,7 +269,8 @@ Else
 		Tap 100, 960 // Enter game
 		For j = 0 To 30
 			Delay (slice)
-			If getPage() = 100 Then 
+			pageNum = getPage()
+			If pageNum = 100 Or pageNum = 61 Then 
 				Exit For
 			End If
 		Next
@@ -274,7 +283,6 @@ Goto Finish
 
 Rem Finish
 EndScript
-
 
 
 /*********************Functions************************/
@@ -292,21 +300,15 @@ Function getPage()
 	If FindStr(26,451,93,510,"活","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
 		TracePrint "Main Page" // Main 0
 		ret = 100
-	ElseIf CmpColorEx("70|100|044AAD,70|195|C08D00,70|290|BF8C00,70|385|BF8C00,70|480|BE8B00", 0.9) = 1 Then
-		TracePrint "Quest Page" // Quest
-		ret = 1
 		
-	ElseIf CmpColorEx("894|84|3CBD76,215|205|C59663,215|355|C59663,62|644|4684AD", 0.9) = 1 Then
-		TracePrint "Fix Page" 	// Fixting
-		ret = 2
+	ElseIf FindStr(933,245,981,287,"准","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
+		TracePrint "TeamPage"	// TeamPage
+		ret = 51
 		
 	ElseIf FindStr(800,41,864,104,"演","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
 		TracePrint "March Page"	// March
 		ret = 3
 		
-	ElseIf FindStr(933,245,981,287,"准","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
-		TracePrint "TeamPage"	// TeamPage
-		ret = 51
 	ElseIf FindStr(1023, 1004, 1074, 1052, "果", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "BattleResult Page" // Battle Result
 		ret = 52
@@ -325,6 +327,9 @@ Function getPage()
 	ElseIf FindStr(865, 523, 916, 573, "给", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then
 		TracePrint "Quick Supply" // Quick supply
 		ret = 60
+	ElseIf FindStr(1010,186,1061,241,"新","FFFFFF-3A3B3A",0.9,intX,intY) > -1 Then
+		TracePrint "News and Announcement"
+		ret = 61
 	ElseIf CmpColorEx("720|720|000000,211|301|000000,250|250|000000,980|980|000000", 0.9) = 1 Then
 		TracePrint "DarkPage"	// Dark
 		ret = 101
@@ -363,13 +368,13 @@ Function needFun(op)
 	needFun = ret
 End Function
 
+/* 完成任务 */
 Function doQuest()
 	TracePrint "DoQuest"
 	tapBtn(2)
 	Delay (slice)
 	Tap (880, 1750)	// Reap first qeust
 	Delay (slice)
-	
 	Tap (370, 960)	// Yes Button
 	Delay (slice)
 	
@@ -387,7 +392,7 @@ Function doMarch()
 	tapBtn(13) 	// Select march
 	Delay (slice) 
 	
-	If getPage() <> 3 Then // Test March Page
+	If getPage() <> 3 Then	// Test March Page
 		doMarch = False
 		Exit Function
 	End If
@@ -395,13 +400,13 @@ Function doMarch()
 	KeepCapture 
 	If FindStr(238,1554,988,1617,"收","FFFFFF-3A3B3A",0.9,intX,intY) > -1 // Found
 		ReleaseCapture
-		Tap(intX, intY) // Reap march
+		Tap(intX, intY) 		// Reap march
 		Delay (slice)
 		
-		Tap(intX, intY) // Tap to continue
+		Tap(intX, intY) 		// Tap to continue
 		Delay (slice)
 		
-		Tap(intX, intY) // March this one again
+		Tap(intX, intY) 		// March this one again
 		Delay(slice*2)
 		If getPage() <> 51 Then // Test Team page
 			doMarch = False
@@ -411,7 +416,7 @@ Function doMarch()
 			doMarch = False
 			Exit Function
 		End If
-		tapBtn(7) // 远征开始Btn
+		tapBtn(7) // March Start Btn
 		Delay (slice)
 		
 		tapBtn(0) // Return to main
@@ -424,155 +429,158 @@ Function doMarch()
 End Function
 
 Function doPVE()
-	Dim i, tmp
 	Dim curTurn = 0
-	tapBtn (1)
-	Delay (slice)
-	tapBtn (11)
-	Delay (2*slice)
-	tmp = getChapter() - chapter
+	
+	tapBtn(1) //Story
+	Delay(slice)
+	
+Rem remChooseChapter
+	For i = 1 To 6 // Test six times, will not fail
+		tapBtn(11) // choose story
+		Delay (slice)
+		tmp = getChapter()
+		If tmp > 0 Then 
+			Exit For
+		End If
+	Next
+	
+	If i = 6 Then  // Cant find chapter
+		doPVE = False
+		Exit Function
+	End If
+	
+	ShowMessage("第"&tmp&"章")
+	//--------------Must get chapter
+		
+	tmp = tmp - chapter 	// Choose chapter
 	// Choose right chapter
-	If tmp < 0 Then // Need to tap next chapter
+	If tmp < 0 Then 		// Need to tap next chapter
 		tmp = tmp * (-1)
 		For i = 1 To tmp
 			tapBtn (4)
-			Delay (slice)
+			Delay (0.1*slice)
 		Next
 	Else 
 		For i = 1 To tmp
 			tapBtn (3)
-			Delay (slice)
+			Delay (0.1*slice)
 		Next
 	End If
 	
+	Delay (slice)
+	Delay (slice*Round(Rnd(), 1))	// Add random delay
+	// Ensure choose chapter
+	If getChapter() <> chapter Then 
+		Delay (slice)
+		If getChapter() <> chapter Then
+			Goto remChooseChapter
+		End If
+	End If
+	
+Rem remChooseSection
+	For i = 1 To 6 // Test six times, will not fail
+		tmp = getSection()
+		If tmp > 0 Then 
+			Exit For
+		End If
+	Next
+	
+	If i = 6 Then  // Cant find section
+		doPVE = False
+		Exit Function
+	End If
+	
+	tmp = tmp - section // Choose section
 	// Choose right section
-	tmp = getSection() - section
-	If tmp < 0 Then // Need to tap next chapter
+	If tmp < 0 Then // Need to tap next section
 		tmp = tmp * (-1)
 		For i = 1 To tmp
 			tapBtn (6)
-			Delay (slice)
+			Delay (0.5*slice)
 		Next
-	Else 
+	Else
 		For i = 1 To tmp
 			tapBtn (5)
-			Delay(slice)
+			Delay (0.5*slice)
 		Next
 	End If
 	
-	// Right one
-	Tap 600, 1000
+	// Ensure choose section
+	If getSection() <> section Then 
+		Delay (slice)
+		If getSection() <> section Then
+			Goto remChooseSection
+		End If
+	End If
+	
+	Tap 600, 1000	//Start battle
 	Delay (slice)
 	
-	getTeam (team)
-	
-	tap(970, 1810) // Qucik supply
+	tap(970, 1810)	// Qucik supply
 	Delay (slice)
-	tap(290, 1280) // Supply all
+	tap(290, 1280)	// Supply all, May disconnect
 	Delay (2 * slice)
-	While (getPage() <> 51)
-		Delay(2 * slice)
-	Wend
-	tapBtn (7)	// Start battle
 	
-	Do
-		If battle() = False Then 
+	fixShip()		// May disconnect
+	
+	tapBtn(7) //start battle
+	
+	Tap 500, 500
+	
+	For i = 1 To 100
+		tmp = getPage()
+		If tmp = 70 Then  //Sight page: suppose we will find them every time
+			If FindPic(647,182,788,567,"Attachment:CV.png","3A3B3A",0,0.9,intX,intY) > -1 Then 
+				ShowMessage("有CV")
+				// No AP
+				doPVE = False
+				Exit Function
+			End If
+			Exit For 
+		ElseIf tmp = 71 Then // Team form page
+			Exit For
+		Else 		// Not reach to sight page
+			Tap 500, 500
+			Delay (0.3 * slice)
+		End If
+	Next
+	
+	// Cant find enemy , disconnect?
+	If i = 100 Then 
+		If fixConnect() = False Then 
 			doPVE = False
 			Exit Function
 		End If
-		
-		If getPage() = 100 Then 
-			doPVE = True
-			Exit Function
-		End If
-		
-		curTurn = curTurn + 1
-		If curTurn >= turn Then 
-			doPVE = True
-			Tap 330, 1180
-			Exit Function
-		End If
-		
-		
-		
-		If needFun(2) Then 
-			doPVE = True
-			// TODO Return to Main
-			Exit Function
-		End If
-		
-		Tap 330, 730 // Go on
-		Delay (slice)
-	Loop
-End Function
-
-Function doActivity()
-	Dim tmp
-	tapBtn(1) //出征
-	Delay(slice)
-	tapBtn(11) // choose 出征
-	Delay (slice)
-	tmp = getChapter() - 2 // Choose chapter 2-1
-	// Choose right chapter
-	If tmp < 0 Then // Need to tap next chapter
-		tmp = tmp * (-1)
-		For i = 1 To tmp
-			tapBtn (4)
-			Delay (slice)
-		Next
-	Else 
-		For i = 1 To tmp
-			tapBtn (3)
-			Delay (slice)
-		Next
 	End If
-	
-	Tap 600, 1000 //Start battle
-	Delay (slice)
-	
-	// Default team 1
-	tap(970, 1810) // Qucik supply
-	Delay (slice)
-	tap(290, 1280) // Supply all
-	Delay (2 * slice)
-	
-	fixShip()
-	
-	tapBtn(7) //start battle
-
-	Tap(500,500)
-	While (getPage() <> 70)	// 索敌画面
-		Tap 500, 500
-		Delay(300)
-	Wend
-	
-	// 索敌
-	
-	If FindColor(473, 326, 597, 502, "FFF321", 0, 0.9, intX, intY) < 0 Then 
-		ShowMessage("没有补给舰")
-		// No AP
-		doActivity = False
-		Exit Function
-	End If
-	// Find AP
-	ShowMessage ("发现补给舰")
 	
 	tapBtn (8)	// Begin Battle
 	Delay (2 * slice)
+	Delay (slice*Round(Rnd(),1))
 	
-	Do
-		tmp = getPage()
-		If tmp = 71 Then	// Select team form
-			Tap 740, 1700	// 复纵
-			Exit Do
+	For i = 1 To 10
+		If getPage() = 71 Then	// Select team form
+			Tap 150, 1550	// 单横
+			Exit For
 		End If
-	Loop
+		Delay (slice)
+	Next
 	
-	Delay(5*slice)
+	Delay (5 * slice)
+	
 	// Enter Battle
-	While getPage() < 0
-    	Delay(5*slice)
-	Wend
+	For i = 1 To 50			// Wait max 3 min
+		If getPage() < 0 Then 
+			Delay ((3*Round(Rnd(),1)+4)*slice)
+		Else 
+			Exit For
+		End If
+	Next
+	If i = 50 Then 			// Lose connection
+		If fixConnect() = False Then 
+			doPVE = False
+			Exit Function
+		End If
+	End If
 	
 	tmp = getPage()
 	If tmp = 73 Then 
@@ -581,27 +589,214 @@ Function doActivity()
 		tapBtn(16) // Night war
 		Delay(5*slice)
 	
-		While getPage() < 0
-    		Delay(5*slice)
-		Wend
+		For i = 1 To 50			// 3 min
+			If getPage() < 0 Then 
+				Delay ((3*Round(Rnd(),1)+4)*slice)
+			Else 
+				Exit For
+			End If
+		Next
+		If i = 50 Then 			// Lose connection
+			If fixConnect() = False Then 
+				doPVE = False
+				Exit Function
+			End If
+		End If
 	End If
 	
 	tmp = getPage()
-	While tmp < 70 Or tmp = 200 // 
-		tapBtn (9)
-		Delay (2 * slice)
-		tmp = getPage()
-	Wend
+	For i = 1 To 50
+		If tmp < 70 Or tmp = 200 Then 
+			tapBtn (9)
+			Delay ((2+Round(Rnd(),1)) * slice)
+			tmp = getPage()
+		Else 
+			Exit For	
+		End If
+	Next
+	If i = 50 Then 				// Lose connection
+		If fixConnect() = False Then 
+			doPVE = False
+			Exit Function
+		End If
+	End If
+
+// ---end of one battle
+	If tmp = 72 Then // Continue battle?
+		tapBtn (17)
+		Delay(slice)
+	End If
 	
-	battle = True
+	doPVE = True
+	
+End Function
+
+Function doActivity()
+	tapBtn(1) //出征
+	Delay(slice)
+	
+Rem remChooseChapter
+	For i = 1 To 6 // Test six times, will not fail
+		tapBtn(11) // choose 出征	
+		Delay (slice)
+		tmp = getChapter()
+		If tmp > 0 Then 
+			Exit For
+		End If
+	Next
+	
+	If i = 6 Then  // Cant find chapter
+		doActivity = False
+		Exit Function
+	End If
+	
+	ShowMessage("第"&tmp&"章")
+	//--------------Must get chapter
+		
+	tmp = tmp - 2 // Choose chapter 2-1
+	// Choose right chapter
+	If tmp < 0 Then // Need to tap next chapter
+		tmp = tmp * (-1)
+		For i = 1 To tmp
+			tapBtn (4)
+			Delay (0.1*slice)
+		Next
+	Else 
+		For i = 1 To tmp
+			tapBtn (3)
+			Delay (0.1*slice)
+		Next
+	End If
+	
+	Delay ((1+Round(Rnd(),1))*slice)
+	// Ensure choose chapter 2
+	If getChapter() <> 2 Then 
+		Delay (slice)
+		If getChapter() <> 2 Then
+			Goto remChooseChapter
+		End If
+	End If
+	
+	Tap 600, 1000	//Start battle
+	Delay (2 * slice)
+	KeepCapture
+	If FindColor(593,475,643,487,"2124A4",0,0.9,intX,intY) > -1 Then // Need to supply	
+		// Default team 1
+		tap(970, 1810)	// Qucik supply
+		Delay (slice)
+		tap(290, 1280)	// Supply all, May disconnect
+		Delay (slice)
+	End If
+	ReleaseCapture
+	
+	fixShip()		// May disconnect
+	
+	tapBtn(7) //start battle
+
+	Tap 500, 500
+	
+	For i = 1 To 100
+		If getPage() = 70 Then  //Sight page: suppose we will find them every time
+			If FindColor(473, 326, 597, 502, "FFF321", 0, 0.9, intX, intY) < 0 Then 
+				ShowMessage("没有补给舰")
+				// No AP
+				doActivity = False
+				Exit Function
+			End If
+			Exit For 
+		Else 		// Not reach to sight page
+			Tap 500, 500
+			Delay (0.3 * slice)
+		End If
+	Next
+	
+	// Cant find enemy , disconnect?
+	If i = 100 Then 
+		If fixConnect() = False Then 
+			doActivity = False
+			Exit Function
+		End If
+	End If
+		
+	// Find AP
+	ShowMessage ("发现补给舰")
+	
+	tapBtn (8)	// Begin Battle
+	Delay (2 * slice)
+	
+	For i = 1 To 10
+		tmp = getPage()
+		If tmp = 71 Then	// Select team form
+			Tap 740, 1700	// 复纵
+			Exit For
+		End If
+		Delay (slice)
+	Next
+	
+	Delay (5 * slice)
+	
+	// Enter Battle
+	For i = 1 To 50			// Wait max 3 min
+		If getPage() < 0 Then 
+			Delay ((3*Round(Rnd(),1)+4)*slice)
+		Else 
+			Exit For
+		End If
+	Next
+	If i = 50 Then 			// Lose connection
+		If fixConnect() = False Then 
+			doActivity = False
+			Exit Function
+		End If
+	End If
+	
+	tmp = getPage()
+	If tmp = 73 Then 
+		// Night War?
+		ShowMessage("追击")
+		tapBtn(16) // Night war
+		Delay(5*slice)
+	
+		For i = 1 To 50			// 3 min
+			If getPage() < 0 Then 
+				Delay ((3*Round(Rnd(),1)+4)*slice)
+			Else 
+				Exit For
+			End If
+		Next
+		If i = 50 Then 			// Lose connection
+			If fixConnect() = False Then 
+				doActivity = False
+				Exit Function
+			End If
+		End If
+	End If
+	
+	tmp = getPage()
+	For i = 1 To 50
+		If tmp < 70 Or tmp = 200 Then 
+			tapBtn (9)
+			Delay ((0.2+Round(Rnd(),1)) * slice)
+			tmp = getPage()
+		Else 
+			Exit For	
+		End If
+	Next
+	If i = 50 Then 				// Lose connection
+		If fixConnect() = False Then 
+			doActivity = False
+			Exit Function
+		End If
+	End If
+	
+	doActivity = True
 End Function
 // Return an avaliable team
 Function getTeam(num)
 
 If num = 0 Then
-	Dim i
 	For i = 0 To 3
-		Tap(360, i*190 + 710) // Team 1-4	
+		Tap(360, (3-i)*190 + 710) // Team 4 -> 1	
 		Delay (0.5*slice)
 		KeepCapture 
 		
@@ -625,7 +820,7 @@ End Function
 
 Function restartApp()
 	KillApp "com.huanmeng.zhanjian2"
-	Delay (3 * slice)
+	Delay (reconnect_time * slice)
 	RunApp "com.huanmeng.zhanjian2"
 End Function
 
@@ -662,9 +857,9 @@ Function tapBtn(op)
 	Case 15 // Aside 5
 		Tap 410, 100
 	Case 16
-		Tap 300, 730 // Night War
+		Tap 300, 730 // Night War/continue battle
 	Case 17
-		Tap 300, 1200 // Give up night war 
+		Tap 300, 1200 // Give up night war/ return to home 
 	Case Else
     	//否则
 	End Select
@@ -678,7 +873,7 @@ Function getChapter()
 	End If
 	ReleaseCapture
 	getChapter = ret
-	ShowMessage "第"&ret&"章"
+//	ShowMessage "第"&ret&"章"
 End Function
 
 Function getSection()
@@ -763,6 +958,7 @@ Function battle()
 	battle = True
 End Function
 
+/* 修理大破 */
 Function fixShip()
 
 	KeepCapture
@@ -787,4 +983,23 @@ Function fixShip()
 	End If
 	ReleaseCapture 
 	
+End Function
+
+/* Reconnect */
+Function fixConnect()
+	If FindStr(787, 723, 841, 776, "认", "FFFFFF-3A3B3A", 0.9, intX, intY) > -1 Then 
+		// Need to reconnect
+		For i = 1 To 10
+			Tap 360, 740 // Yes
+			Delay (5 * slice)
+			If FindStr(787, 723, 841, 776, "认", "FFFFFF-3A3B3A", 0.9, intX, intY) < 0 Then // Reconnect successfully
+				fixConnect = True	
+				Exit Function
+			End If
+		Next
+		// Reconnect failed
+		fixConnect = False
+		Exit Function
+	End If
+	fixConnect = True
 End Function
